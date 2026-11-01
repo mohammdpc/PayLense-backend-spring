@@ -1,3 +1,4 @@
+
 package org.example.paylensebackendspring.service;
 
 import lombok.RequiredArgsConstructor;
@@ -36,15 +37,25 @@ public class AuthService {
 
     @Transactional
     public UserResponse register(RegisterRequest request) {
-        String email = normalize(request.email());
 
-        if (contactRepository.existsByContactTypeAndContactValue(ContactType.EMAIL, email)
-                || userRepository.existsByUsername(email)) {
+        String username = request.username().trim();
+        String email = normalizeEmail(request.email());
+        String phone = normalizePhone(request.phone());
+
+        if (userRepository.existsByUsername(username)) {
+            throw new DuplicateResourceException("Username is already taken");
+        }
+
+        if (contactRepository.existsByContactTypeAndContactValue(ContactType.EMAIL, email)) {
             throw new DuplicateResourceException("Email is already registered");
         }
 
+        if (contactRepository.existsByContactTypeAndContactValue(ContactType.PHONE, phone)) {
+            throw new DuplicateResourceException("Phone number is already registered");
+        }
+
         User user = userRepository.save(User.builder()
-                .username(email)
+                .username(username)
                 .passwordHash(passwordEncoder.encode(request.password()))
                 .build());
 
@@ -55,21 +66,56 @@ public class AuthService {
                 .primary(true)
                 .build());
 
-        appSettingsRepository.save(AppSettings.builder().user(user).build());
-        notificationPreferenceRepository.save(NotificationPreference.builder().user(user).build());
+        contactRepository.save(UserContactMethod.builder()
+                .user(user)
+                .contactType(ContactType.PHONE)
+                .contactValue(phone)
+                .primary(false)
+                .build());
+
+        appSettingsRepository.save(AppSettings.builder()
+                .user(user)
+                .build());
+
+        notificationPreferenceRepository.save(NotificationPreference.builder()
+                .user(user)
+                .build());
 
         return UserResponse.from(user);
     }
 
     @Transactional(readOnly = true)
     public AuthResponse login(LoginRequest request) {
-        String email = normalize(request.email());
 
-        UserContactMethod contact = contactRepository
-                .findByContactTypeAndContactValue(ContactType.EMAIL, email)
-                .orElseThrow(InvalidCredentialsException::new);
+        String identifier = request.identifier().trim();
 
-        User user = contact.getUser();
+        User user;
+
+        if (identifier.contains("@")) {
+
+            String email = normalizeEmail(identifier);
+
+            UserContactMethod contact = contactRepository
+                    .findByContactTypeAndContactValue(ContactType.EMAIL, email)
+                    .orElseThrow(InvalidCredentialsException::new);
+
+            user = contact.getUser();
+
+        } else if (identifier.matches("^\\+?[0-9]{8,15}$")) {
+
+            String phone = normalizePhone(identifier);
+
+            UserContactMethod contact = contactRepository
+                    .findByContactTypeAndContactValue(ContactType.PHONE, phone)
+                    .orElseThrow(InvalidCredentialsException::new);
+
+            user = contact.getUser();
+
+        } else {
+
+            user = userRepository.findByUsername(identifier)
+                    .orElseThrow(InvalidCredentialsException::new);
+        }
 
         if (!user.isActive() || user.isDeleted()
                 || !passwordEncoder.matches(request.password(), user.getPasswordHash())) {
@@ -79,7 +125,11 @@ public class AuthService {
         return jwtService.generateToken(user.getId());
     }
 
-    private String normalize(String email) {
+    private String normalizeEmail(String email) {
         return email.trim().toLowerCase();
+    }
+
+    private String normalizePhone(String phone) {
+        return phone.trim();
     }
 }
