@@ -1,27 +1,24 @@
 package org.example.paylensebackendspring.dto;
 
-import org.example.paylensebackendspring.entity.Account;
-import org.example.paylensebackendspring.enums.AccountStatus;
+import org.example.paylensebackendspring.entity.FinancialAccount;
 
-import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.UUID;
 
 public record AccountResponse(
-        Long id,
-        String accountNumber,
-        BigDecimal balance,
+        UUID id,
+        String accountName,
         String currency,
-        AccountStatus status,
+        String accountStatus,
         Instant createdAt
 ) {
-    public static AccountResponse from(Account account) {
+    public static AccountResponse from(FinancialAccount e) {
         return new AccountResponse(
-                account.getId(),
-                account.getAccountNumber(),
-                account.getBalance(),
-                account.getCurrency(),
-                account.getStatus(),
-                account.getCreatedAt()
+                e.getId(),
+                e.getAccountName(),
+                e.getCurrency(),
+                e.getAccountStatus(),
+                e.getCreatedAt()
         );
     }
 }

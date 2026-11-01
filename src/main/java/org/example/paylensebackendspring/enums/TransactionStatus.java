@@ -1,5 +1,5 @@
 package org.example.paylensebackendspring.enums;
 
 public enum TransactionStatus {
-    PENDING, SUCCESS, FAILED
+    PENDING, PROCESSING, COMPLETED, FAILED, CANCELLED, REVERSED
 }
